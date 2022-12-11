@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '/home/nyre/Documenti/progetti/prog_python/dolphin_service_menu_creator/ui_actions_menu_manager.ui'
+# Form implementation generated from reading ui file 'ui_dolphin_service_menus_creator.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.6
 #
@@ -149,6 +149,7 @@ class Ui_Form(object):
         self.gridLayout.addLayout(self.horizontalLayout_3, 2, 1, 1, 2)
         self.lineEdit_mimetype = QtWidgets.QLineEdit(self.frame_right)
         self.lineEdit_mimetype.setText("")
+        self.lineEdit_mimetype.setMaxLength(999999999)
         self.lineEdit_mimetype.setPlaceholderText("")
         self.lineEdit_mimetype.setClearButtonEnabled(True)
         self.lineEdit_mimetype.setObjectName("lineEdit_mimetype")
@@ -158,6 +159,7 @@ class Ui_Form(object):
         self.lineEdit_command.setAccessibleDescription("")
         self.lineEdit_command.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.lineEdit_command.setText("")
+        self.lineEdit_command.setMaxLength(999999999)
         self.lineEdit_command.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.lineEdit_command.setCursorMoveStyle(QtCore.Qt.LogicalMoveStyle)
         self.lineEdit_command.setClearButtonEnabled(True)

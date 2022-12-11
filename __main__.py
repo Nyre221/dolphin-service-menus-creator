@@ -37,6 +37,7 @@ class Main(Ui_Form):
         self.create_script_on_save = False
         self.script_attached = False
         self.script_opened_externally = False
+        self.current_action_row = 0
 
         # set the default text (after translation) for the plainTextEdit
         self.textedit_script.setPlainText(self.script_default_text)
@@ -47,13 +48,17 @@ class Main(Ui_Form):
         self.icons_themes_paths.extend(list(glob.glob(f'{self.home_directory}/.local/share/icons/*')))
         self.kdeglobals_path = self.home_directory + "/.config/kdeglobals"
         self.editor_directory = self.home_directory + "/.config/dolphin_service_menus_creator"
-        self.service_menu_directory = self.home_directory + "/.local/share/kservices5/ServiceMenus/"
+        # directory to search for .desktop files
+        self.servicemenus_locations = [self.home_directory + "/.local/share/kservices5/ServiceMenus/"]
+        # append the NEW plasma service menus folder if exist
+        if os.listdir(self.home_directory + "/.local/share/kio/servicemenus/"):
+            self.servicemenus_locations.append(self.home_directory + "/.local/share/kio/servicemenus/")
+        # a dictionary that contain the paths of the .desktop files.
+        self.desktop_files_paths = {}
         self.path_to_desktop_file = ""
         self.desktop_file_text: str = ""
         self.current_script_path = ""
         self.desktop_file_name = ""
-
-
 
         # hide the unnecessary label
         self.label_save_before_exit.hide()
@@ -67,10 +72,10 @@ class Main(Ui_Form):
         self.frame_right.setDisabled(True)
 
         # create the required folders (first run)
-        os.makedirs(self.service_menu_directory, exist_ok=True)
         os.makedirs(self.editor_directory, exist_ok=True)
-
-
+        # create the old servicemenus directory if it doesn't exist.
+        # I'm not creating both because on old plasma version it doesn't exist and the old still works on modern plasma.
+        os.makedirs(self.servicemenus_locations[0], exist_ok=True)
 
         self.load_desktop_files()
 
@@ -92,22 +97,31 @@ class Main(Ui_Form):
         self.textedit_script.textChanged.connect(self.script_edited)
 
     def load_desktop_files(self):
-        # clear the list because otherwise it will add two times the .desktop file when called as an update function
+        # clear the list and the dictionary because otherwise it will add two times the .desktop file when called as
+        # an update function
+        self.desktop_files_paths = {}
         self.listWidget_actions_list.clear()
 
-        for x in os.listdir(self.service_menu_directory):
-            if x.endswith(".desktop"):
-                self.listWidget_actions_list.addItem(x)
+        # add the elements to the actions list (gui) and to a dictionary for storing  name + path
+        # this is needed because deleting the element is not reliable with an index list
+        # qt seems to update the current row number after calling the signal item_selection_changed
+        # this is necessary in first place because of the need of having to support two different service menus path
+        for directory in self.servicemenus_locations:
+            for file_name in os.listdir(directory):
+                if file_name.endswith(".desktop"):
+                    self.desktop_files_paths[file_name] = directory + file_name
+                    self.listWidget_actions_list.addItem(file_name)
 
     def on_add_button_clicked(self):
-
         name = self.lineEdit_add_name.text().strip()
         if name == "":
             return
         filename = name + ".desktop"
+        save_path = self.servicemenus_locations[0] + filename
         # check if the file already exist
         try:
-            file = open(self.service_menu_directory + filename, "xt")
+            # save in the old plasma service menu folder for compatibility reasons [0]
+            file = open(save_path, "xt")
             new_desktop_text = extra_text.default_desktop_text
             new_desktop_text = re.sub('^Name.*', f"Name={name}", new_desktop_text, flags=re.MULTILINE)
             file.write(new_desktop_text)
@@ -116,10 +130,12 @@ class Main(Ui_Form):
             self.label_desktopfile_already_exist_warning.show()
             return
 
-        # add and select the new item
-        item = QtWidgets.QListWidgetItem(filename)
-        self.listWidget_actions_list.addItem(item)
-        self.listWidget_actions_list.setCurrentItem(item)
+        # appen the new file path to the dictionary
+        self.desktop_files_paths[filename] = (save_path)
+        # add and select the new action
+        action = QtWidgets.QListWidgetItem(filename)
+        self.listWidget_actions_list.addItem(action)
+        self.listWidget_actions_list.setCurrentItem(action)
 
         self.lineEdit_add_name.clear()
 
@@ -131,7 +147,7 @@ class Main(Ui_Form):
         # workaround because the file directly altered with python don't work
         # on old version of dolphin or python probably due to a bug.
         # EXTRA:if I use open(path, w) instead of "wt" it seems to work,
-        # but it's a bug that happens sometimes and I want to play it safe
+        # but it's a bug that happens sometimes and I want to play it safe.
         # Reopen the file and save it again.
         subprocess.run(["bash", "-c", f"sed -i 's/ / /' '{self.path_to_desktop_file}'"])
 
@@ -154,7 +170,9 @@ class Main(Ui_Form):
         if self.script_attached and not self.create_script_on_save and os.path.isfile(self.current_script_path):
             os.remove(self.current_script_path)
 
-        # remove the action from the menu and set the frame to disabled if there are no items left
+        # remove the action from the dictionary
+        self.desktop_files_paths.pop(self.desktop_file_name)
+        # remove the action from the menu and set the frame to disabled if there are no actions left
         self.listWidget_actions_list.takeItem(
             self.listWidget_actions_list.row(self.listWidget_actions_list.currentItem()))
         if self.listWidget_actions_list.count() == 0:
@@ -225,18 +243,18 @@ class Main(Ui_Form):
             self.set_new_icon(result.stdout.strip("\n"))
 
     def on_item_selection_changed(self):
-        current_item = self.listWidget_actions_list.currentItem()
-        if current_item == None:
+        # get current row and name of the action
+        current_action = self.listWidget_actions_list.currentItem()
+        # avoid crashing if there are no actions in the list
+        if current_action == None:
             return
-
-        current_item_text = current_item.text()
-
-        self.desktop_file_name = current_item_text
-        self.path_to_desktop_file = self.service_menu_directory + self.desktop_file_name
+        self.desktop_file_name = current_action.text()
+        # set the path to the desktop file and load the information
+        self.path_to_desktop_file = self.desktop_files_paths[self.desktop_file_name]
         self.load_new_file_information()
 
     def load_new_file_information(self):
-
+        self.create_script_on_save = False
         self.script_opened_externally = False
         self.button_open_script.setDisabled(True)
 
@@ -248,15 +266,20 @@ class Main(Ui_Form):
         self.desktop_file_text = file.read()
         file.close()
 
+        # add the string for the submenu if it is missing from the .desktop
+        self.desktop_file_text = self.add_submenu(self.desktop_file_text)
+
         # extract the data from the .desktop file
         name_string = re.search('^Name.*', self.desktop_file_text, flags=re.MULTILINE)
-        name = name_string.group(0).split("=")[1]
+        # name and command can contain repetitions of "="
+        name = "".join(name_string.group(0).split("=")[1:])
         mime_type_string = re.search('^MimeType.*', self.desktop_file_text, flags=re.MULTILINE)
-        mime_type = mime_type_string.group(0).split("=")[1]
-        submenu_string = re.search('^X-KDE-Submenu.*', self.desktop_file_text, flags=re.MULTILINE)
-        submenu = submenu_string.group(0).split("=")[1]
+        mime_type = "".join(mime_type_string.group(0).split("=")[1:])
         command_string = re.search('^Exec.*', self.desktop_file_text, flags=re.MULTILINE)
-        command = command_string.group(0).split("=")[1]
+        command = "".join(command_string.group(0).split("=")[1:])
+        submenu_string = re.search('^X-KDE-Submenu.*', self.desktop_file_text, flags=re.MULTILINE)
+        submenu = "".join(submenu_string.group(0).split("=")[1:])
+
         # this is needed to get the icon preview because the string name is not enough
         self.set_icon_preview()
 
@@ -288,13 +311,47 @@ class Main(Ui_Form):
         self.label_export_warning.hide()
         # check if the desktop file have more than one action and disable the frame if this is the case
         # multi actions per file not implemented (compatibility)
-        action_count = len(re.findall(re.escape('[Desktop Action'), self.desktop_file_text))
+        action_count = len(re.findall(f"^{re.escape('[')}Desktop Action", self.desktop_file_text, flags=re.MULTILINE))
         if action_count > 1:
             self.set_compatibility_button(True)
             self.label_incompatible_action_warning.show()
         else:
             # enable the button,editline, etc. if the file is compatible
             self.set_compatibility_button(False)
+
+    def add_submenu(self, text):
+        # check if the submenu and X-KDE-Priority are written twice. some .desktops don't have the submenu string and
+        # this prevents the program from modifying it. Also, if the submenu is not written under the correct section
+        # [Desktop Entry] it doesn't work. I decided to write it everywhere to be safe. I'm not sure how older
+        # versions of dolphin dealt with this (some things have changed now.)
+        parameters_to_add = []
+        # X-KDE-Priority is needed because otherwise the sub-menu doesn't work. in older versions of dolphin it was
+        # used to keep the newly created action out of the dolphin actions submenu (the general one) and keep it on
+        # top, but now it just creates two submenus with the same name in the context menu.
+        for parameter in ["X-KDE-Priority", "X-KDE-Submenu"]:
+            if len(re.findall(f"^{parameter}", text, flags=re.MULTILINE)) < 2:
+                parameters_to_add.append(parameter)
+
+        # use the same submenu name if the string exists at least once
+        submenu_original_string = re.findall(f"^X-KDE-Submenu.*", text, flags=re.MULTILINE)
+        if len(submenu_original_string) > 0:  # check if already exist but not
+            submenu_string = submenu_original_string[0]
+        else:
+            submenu_string = "X-KDE-Submenu="
+
+        new_text = ""
+        if not parameters_to_add == []:
+            for line in text.splitlines(keepends=True):
+                new_text += line
+                # add the missing parameters under any string starting with [Desktop
+                if line.strip().startswith("[Desktop"):
+                    for parameter in parameters_to_add:
+                        if "Priority" in parameter:
+                            new_text += f"{parameter}=TopLevel\n"
+                        elif "Submenu" in parameter:
+                            new_text += f"{submenu_string}\n"
+            text = new_text
+        return text
 
     def set_compatibility_button(self, disable=True):
         # disabled the button/linEdit, etc. if the file is incompatible
@@ -371,16 +428,11 @@ class Main(Ui_Form):
             # setting the new string in the lineEdit and should trigger the text_changed signal
             self.lineEdit_mimetype.setText(new_mimetype_string)
 
-    def set_new_icon(self, icon_name):
-        self.desktop_file_text = re.sub('^Icon.*', f"Icon={icon_name}", self.desktop_file_text, flags=re.MULTILINE)
-        self.set_icon_preview()
-        self.show_save_warning()
-
     def set_icon_preview(self):
         # get the string relative to the icon in the .desktop file
         icon_string = re.search('^Icon.*', self.desktop_file_text, flags=re.MULTILINE)
         # get the name of the icon
-        icon = icon_string.group(0).split("=")[1]
+        icon = "".join(icon_string.group(0).split("=")[1:])
         # use directly the icon name if it is a valid path (when selected a local file from kdialog)
         if os.path.isabs(icon):
             icon_path = icon
@@ -445,26 +497,34 @@ class Main(Ui_Form):
     # .desktopfile (not save to file) instead of retrieving the data when the save button is pressed. I have done
     # this because I think it can be more flexible (but less maintainable) and necessary for the icon because there
     # is no text to retrieve normally and I need the signal for the save waring message in any case
+    # NOTA: using lambda x: is the only way I found to avoid processing escape characters while using re.sub()
     def set_new_name(self):
         name = self.lineEdit_name.text()
-        self.desktop_file_text = re.sub('^Name.*', f"Name={name}", self.desktop_file_text, flags=re.MULTILINE)
+        self.desktop_file_text = re.sub('^Name.*', lambda x: f"Name={name}", self.desktop_file_text, flags=re.MULTILINE)
         self.show_save_warning()
 
     def set_new_submenu(self):
         sumbmenu_name = self.lineEdit_submenu.text()
-        self.desktop_file_text = re.sub('^X-KDE-Submenu.*', f"X-KDE-Submenu={sumbmenu_name}", self.desktop_file_text,
-                                        flags=re.MULTILINE)
+        self.desktop_file_text = re.sub('^X-KDE-Submenu.*', lambda x: f"X-KDE-Submenu={sumbmenu_name}",
+                                        self.desktop_file_text, flags=re.MULTILINE)
         self.show_save_warning()
 
     def set_new_command(self):
         command_name = self.lineEdit_command.text()
-        self.desktop_file_text = re.sub('^Exec.*', f"Exec={command_name}", self.desktop_file_text, flags=re.MULTILINE)
+        self.desktop_file_text = re.sub('^Exec.*', lambda x: f"Exec={command_name}", self.desktop_file_text,
+                                        flags=re.MULTILINE)
         self.show_save_warning()
 
     def set_new_mimetype(self):
         mimetype_name = self.lineEdit_mimetype.text()
-        self.desktop_file_text = re.sub('^MimeType.*', f"MimeType={mimetype_name}", self.desktop_file_text,
+        self.desktop_file_text = re.sub('^MimeType.*', lambda x: f"MimeType={mimetype_name}", self.desktop_file_text,
                                         flags=re.MULTILINE)
+        self.show_save_warning()
+
+    def set_new_icon(self, icon_name):
+        self.desktop_file_text = re.sub('^Icon.*', lambda x: f"Icon={icon_name}", self.desktop_file_text,
+                                        flags=re.MULTILINE)
+        self.set_icon_preview()
         self.show_save_warning()
 
     def show_save_warning(self):
@@ -490,18 +550,20 @@ class Main(Ui_Form):
         # Qtdesigner don't set the placeholder text for some reason and I want to add a script default text
         self.set_extra_text(locale_key)
 
-    def set_extra_text(self,locale_key):
+    def set_extra_text(self, locale_key):
         # very dirty way but it is enough
         name_placeholder_text = placeholder_translations[locale_key].get("Name", placeholder_translations["en"]["Name"])
         command_placeholder_text = placeholder_translations[locale_key].get("Command",
-                                                                        placeholder_translations["en"]["Command"])
+                                                                            placeholder_translations["en"]["Command"])
         mimetype_placeholder_text = placeholder_translations[locale_key].get("Mimetype",
-                                                                         placeholder_translations["en"]["Mimetype"])
+                                                                             placeholder_translations["en"]["Mimetype"])
         submenu_placeholder_text = placeholder_translations[locale_key].get("Submenu",
-                                                                        placeholder_translations["en"]["Submenu"])
+                                                                            placeholder_translations["en"]["Submenu"])
         # this is the default text of the script
         # I'm translating it because I want to add useful information in it
-        self.script_default_text = extra_translations.script_default_text_dict.get(locale_key,extra_translations.script_default_text_dict["en"])
+        self.script_default_text = extra_translations.script_default_text_dict.get(locale_key,
+                                                                                   extra_translations.script_default_text_dict[
+                                                                                       "en"])
 
         self.lineEdit_add_name.setPlaceholderText(name_placeholder_text)
         self.lineEdit_name.setPlaceholderText(name_placeholder_text)

@@ -266,6 +266,9 @@
             <property name="text">
              <string/>
             </property>
+            <property name="maxLength">
+             <number>999999999</number>
+            </property>
             <property name="placeholderText">
              <string/>
             </property>
@@ -287,6 +290,9 @@
             </property>
             <property name="text">
              <string/>
+            </property>
+            <property name="maxLength">
+             <number>999999999</number>
             </property>
             <property name="alignment">
              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>

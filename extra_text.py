@@ -13,6 +13,8 @@ Icon=kde
 Exec=
 
 [Desktop Action default_action]
+X-KDE-Priority=TopLevel
+X-KDE-Submenu=
 Name=Name
 Icon=kde
 Exec=
