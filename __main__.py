@@ -271,14 +271,13 @@ class Main(Ui_Form):
 
         # extract the data from the .desktop file
         name_string = re.search('^Name.*', self.desktop_file_text, flags=re.MULTILINE)
-        # name and command can contain repetitions of "="
-        name = "".join(name_string.group(0).split("=")[1:])
+        name = name_string.group(0).split("=",1)[1]
         mime_type_string = re.search('^MimeType.*', self.desktop_file_text, flags=re.MULTILINE)
-        mime_type = "".join(mime_type_string.group(0).split("=")[1:])
+        mime_type = mime_type_string.group(0).split("=",1)[1]
         command_string = re.search('^Exec.*', self.desktop_file_text, flags=re.MULTILINE)
-        command = "".join(command_string.group(0).split("=")[1:])
+        command = command_string.group(0).split("=",1)[1]
         submenu_string = re.search('^X-KDE-Submenu.*', self.desktop_file_text, flags=re.MULTILINE)
-        submenu = "".join(submenu_string.group(0).split("=")[1:])
+        submenu = submenu_string.group(0).split("=",1)[1]
 
         # this is needed to get the icon preview because the string name is not enough
         self.set_icon_preview()
@@ -432,7 +431,7 @@ class Main(Ui_Form):
         # get the string relative to the icon in the .desktop file
         icon_string = re.search('^Icon.*', self.desktop_file_text, flags=re.MULTILINE)
         # get the name of the icon
-        icon = "".join(icon_string.group(0).split("=")[1:])
+        icon = icon_string.group(0).split("=",1)[1]
         # use directly the icon name if it is a valid path (when selected a local file from kdialog)
         if os.path.isabs(icon):
             icon_path = icon
