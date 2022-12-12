@@ -1,0 +1,1 @@
+available_qt_translations = ["it_IT", "nl_NL"]
