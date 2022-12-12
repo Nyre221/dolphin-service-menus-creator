@@ -263,8 +263,11 @@ class Main(Ui_Form):
         self.desktop_file_text = file.read()
         file.close()
 
+        #remove space at the beginning of every line
+        self.desktop_file_text = re.sub("^ ","",self.desktop_file_text, flags=re.MULTILINE)
+
         # add the string for the submenu if it is missing from the .desktop
-        self.desktop_file_text = self.add_submenu(self.desktop_file_text)
+        self.desktop_file_text = self.add_submenu_and_priority(self.desktop_file_text)
 
         # extract the data from the .desktop file
         name_string = re.search('^Name.*', self.desktop_file_text, flags=re.MULTILINE)
@@ -275,7 +278,6 @@ class Main(Ui_Form):
         command = command_string.group(0).split("=", 1)[1]
         submenu_string = re.search('^X-KDE-Submenu.*', self.desktop_file_text, flags=re.MULTILINE)
         submenu = submenu_string.group(0).split("=", 1)[1]
-
         # this is needed to get the icon preview because the string name is not enough
         self.set_icon_preview()
 
@@ -315,7 +317,7 @@ class Main(Ui_Form):
             # enable the button,editline, etc. if the file is compatible
             self.set_compatibility_button(False)
 
-    def add_submenu(self, text):
+    def add_submenu_and_priority(self, text):
         # check if the submenu and X-KDE-Priority are written twice. some .desktops don't have the submenu string and
         # this prevents the program from modifying it. Also, if the submenu is not written under the correct section
         # [Desktop Entry] it doesn't work. I decided to write it everywhere to be safe. I'm not sure how older
