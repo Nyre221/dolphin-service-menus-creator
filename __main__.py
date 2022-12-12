@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
-import importlib.resources
 from PyQt5 import QtGui, QtWidgets, QtCore
-
-import translations
-from translations import extra_translations
-from translations.extra_translations import placeholder_translations
+import translation_manager
 from ui_dolphin_service_menus_creator import Ui_Form
 import os
 import sys
@@ -43,6 +39,7 @@ class Main(Ui_Form):
         self.textedit_script.setPlainText(self.script_default_text)
 
         # set strings
+
         self.home_directory = os.path.expanduser("~")
         self.icons_themes_paths = list(glob.glob(f'/usr/share/icons/*'))
         self.icons_themes_paths.extend(list(glob.glob(f'{self.home_directory}/.local/share/icons/*')))
@@ -271,13 +268,13 @@ class Main(Ui_Form):
 
         # extract the data from the .desktop file
         name_string = re.search('^Name.*', self.desktop_file_text, flags=re.MULTILINE)
-        name = name_string.group(0).split("=",1)[1]
+        name = name_string.group(0).split("=", 1)[1]
         mime_type_string = re.search('^MimeType.*', self.desktop_file_text, flags=re.MULTILINE)
-        mime_type = mime_type_string.group(0).split("=",1)[1]
+        mime_type = mime_type_string.group(0).split("=", 1)[1]
         command_string = re.search('^Exec.*', self.desktop_file_text, flags=re.MULTILINE)
-        command = command_string.group(0).split("=",1)[1]
+        command = command_string.group(0).split("=", 1)[1]
         submenu_string = re.search('^X-KDE-Submenu.*', self.desktop_file_text, flags=re.MULTILINE)
-        submenu = submenu_string.group(0).split("=",1)[1]
+        submenu = submenu_string.group(0).split("=", 1)[1]
 
         # this is needed to get the icon preview because the string name is not enough
         self.set_icon_preview()
@@ -431,7 +428,7 @@ class Main(Ui_Form):
         # get the string relative to the icon in the .desktop file
         icon_string = re.search('^Icon.*', self.desktop_file_text, flags=re.MULTILINE)
         # get the name of the icon
-        icon = icon_string.group(0).split("=",1)[1]
+        icon = icon_string.group(0).split("=", 1)[1]
         # use directly the icon name if it is a valid path (when selected a local file from kdialog)
         if os.path.isabs(icon):
             icon_path = icon
@@ -535,40 +532,22 @@ class Main(Ui_Form):
             self.label_unused_script_warning.show()
 
     def load_translation(self, Form):
-        locale_key = "en"
-        if "it_IT" in self.system_locale:
-            locale_key = "it"
+        translator = translation_manager.Translator()
+        qt_translation = translator.get_qt_translation()
+        # load the qt translation if it is available.
+        if qt_translation is not None:
             self.trans = QtCore.QTranslator()
-            # load the translation from a package. needed because if the program is zipped with zipapp
-            # the translation cannot be loaded with load("path/to/file/name")
-            translation = importlib.resources.read_binary(translations, "eng-it.qm")
-            self.trans.loadFromData(translation)
+            self.trans.loadFromData(qt_translation)
             QtWidgets.QApplication.instance().installTranslator(self.trans)
             self.retranslateUi(Form)
-
-        # Qtdesigner don't set the placeholder text for some reason and I want to add a script default text
-        self.set_extra_text(locale_key)
-
-    def set_extra_text(self, locale_key):
-        # very dirty way but it is enough
-        name_placeholder_text = placeholder_translations[locale_key].get("Name", placeholder_translations["en"]["Name"])
-        command_placeholder_text = placeholder_translations[locale_key].get("Command",
-                                                                            placeholder_translations["en"]["Command"])
-        mimetype_placeholder_text = placeholder_translations[locale_key].get("Mimetype",
-                                                                             placeholder_translations["en"]["Mimetype"])
-        submenu_placeholder_text = placeholder_translations[locale_key].get("Submenu",
-                                                                            placeholder_translations["en"]["Submenu"])
-        # this is the default text of the script
-        # I'm translating it because I want to add useful information in it
-        self.script_default_text = extra_translations.script_default_text_dict.get(locale_key,
-                                                                                   extra_translations.script_default_text_dict[
-                                                                                       "en"])
-
-        self.lineEdit_add_name.setPlaceholderText(name_placeholder_text)
-        self.lineEdit_name.setPlaceholderText(name_placeholder_text)
-        self.lineEdit_submenu.setPlaceholderText(submenu_placeholder_text)
-        self.lineEdit_command.setPlaceholderText(command_placeholder_text)
-        self.lineEdit_mimetype.setPlaceholderText(mimetype_placeholder_text)
+        # translate the placeholder strings
+        # QtDesigner doesn't save them for some reason, and so I'm adding/translating them separately.
+        self.lineEdit_add_name.setPlaceholderText(translator.translate("Name"))
+        self.lineEdit_name.setPlaceholderText(translator.translate("Name"))
+        self.lineEdit_submenu.setPlaceholderText(translator.translate("Submenu"))
+        self.lineEdit_command.setPlaceholderText(translator.translate("Command"))
+        self.lineEdit_mimetype.setPlaceholderText(translator.translate("Mimetype"))
+        self.script_default_text = translator.translate("Script_text")
 
 
 if __name__ == "__main__":
