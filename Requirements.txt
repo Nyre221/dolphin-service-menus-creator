@@ -1,0 +1,8 @@
+Kubuntu 22/23:
+sudo apt install python3-pyqt5
+
+Fedora 37/38:
+sudo dnf install python3-qt5
+
+Manjaro:
+sudo pacman -S python-pyqt5
