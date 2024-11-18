@@ -40,8 +40,10 @@ chmod +x $HOME/"$relative_script_path"
 fi
 
 
-mkdir -p ~/.local/share/kservices5/ServiceMenus/
-cp "$HERE"/"$desktop_file" $HOME/.local/share/kservices5/ServiceMenus/
+mkdir -p ~/.local/share/kio/servicemenus/
+cp "$HERE"/"$desktop_file" $HOME/.local/share/kio/servicemenus/
+chmod +x $HOME/.local/share/kio/servicemenus/"$desktop_file"
+
 kdialog --passivepopup Installed 2
 
 echo -e "\n\n\nINSTALLED"

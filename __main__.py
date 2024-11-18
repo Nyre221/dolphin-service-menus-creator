@@ -46,10 +46,7 @@ class Main(Ui_Form):
         self.kdeglobals_path = self.home_directory + "/.config/kdeglobals"
         self.editor_directory = self.home_directory + "/.config/dolphin_service_menus_creator"
         # directory to search for .desktop files
-        self.servicemenus_locations = [self.home_directory + "/.local/share/kservices5/ServiceMenus/"]
-        # append the NEW plasma service menus folder if exist
-        if os.listdir(self.home_directory + "/.local/share/kio/servicemenus/"):
-            self.servicemenus_locations.append(self.home_directory + "/.local/share/kio/servicemenus/")
+        self.servicemenus_locations = [self.home_directory + "/.local/share/kio/servicemenus/"]
         # a dictionary that contain the paths of the .desktop files.
         self.desktop_files_paths = {}
         self.path_to_desktop_file = ""
@@ -123,6 +120,8 @@ class Main(Ui_Form):
             new_desktop_text = re.sub('^Name.*', f"Name={name}", new_desktop_text, flags=re.MULTILINE)
             file.write(new_desktop_text)
             file.close()
+            subprocess.run(["chmod", "+x", f"{save_path}"])
+
         except FileExistsError:
             self.label_desktopfile_already_exist_warning.show()
             return
@@ -147,7 +146,6 @@ class Main(Ui_Form):
         # but it's a bug that happens sometimes and I want to play it safe.
         # Reopen the file and save it again.
         subprocess.run(["bash", "-c", f"sed -i 's/ / /' '{self.path_to_desktop_file}'"])
-
         if self.create_script_on_save:
             self.create_script()
 
